@@ -122,6 +122,73 @@ contract('HCVoting (vote)', ([appManager, voter1, voter2, voter3, voter4]) => {
           it('calculates the correct absolute consensus', async () => {
             assert.equal((await app.getConsensus(0)).toNumber(), VOTE.YEA, 'incorrect absolute consensus')
           })
+
+          describe('when voter1 transfers its tokens to voter3', () => {
+            before('transfer tokens', async () => {
+              await voteToken.transfer(voter3, VOTER_BALANCE, { from: voter1 })
+            })
+
+            after('return tokens', async () => {
+              await voteToken.transfer(voter1, VOTER_BALANCE, { from: voter3 })
+            })
+
+            it('reverts when voter3 attempts to vote on the proposal', async () => {
+              await assertRevert(
+                app.vote(0, true, { from: voter3 }),
+                'HCVOTING_NO_VOTING_POWER'
+              )
+            })
+          })
+
+          describe('when the vote token supply increases after the proposal was created', () => {
+            before('mint tokens', async () => {
+              await voteToken.generateTokens(voter3, VOTER_BALANCE)
+              await voteToken.generateTokens(voter4, VOTER_BALANCE)
+            })
+
+            it('calculated absolute support does not change', async () => {
+              assert.equal((await app.getSupport(0, true)).toNumber(), calculateSupport(2, 2), 'incorrect absolute positive support')
+              assert.equal((await app.getSupport(0, false)).toNumber(), calculateSupport(0, 2), 'incorrect absolute negative support')
+            })
+
+            it('calculates absolute consensus does not change', async () => {
+              assert.equal((await app.getConsensus(0)).toNumber(), VOTE.YEA, 'incorrect absolute consensus')
+            })
+
+            describe('when another proposal is created and multiple votes are casted on it', () => {
+              before('create another proposal', async () => {
+                await app.create('Proposal metadata 1')
+              })
+
+              before('cast multiple votes', async () => {
+                await app.vote(1, true, { from: voter1 })
+                await app.vote(1, false, { from: voter2 })
+                await app.vote(1, false, { from: voter3 })
+                await app.vote(1, false, { from: voter4 })
+              })
+
+              it('registers the correct totalYeas/totalNays', async () => {
+                assert.equal((await app.getTotalYeas(1)).toNumber(), 1 * VOTER_BALANCE, 'invalid yeas')
+                assert.equal((await app.getTotalNays(1)).toNumber(), 3 * VOTER_BALANCE, 'invalid nays')
+              })
+
+              it('registers each user\'s vote', async () => {
+                assert.equal((await app.getVote(1, voter1)).toNumber(), VOTE.YEA)
+                assert.equal((await app.getVote(1, voter2)).toNumber(), VOTE.NAY)
+                assert.equal((await app.getVote(1, voter3)).toNumber(), VOTE.NAY)
+                assert.equal((await app.getVote(1, voter4)).toNumber(), VOTE.NAY)
+              })
+
+              it('calculates the correct absolute support', async () => {
+                assert.equal((await app.getSupport(1, true)).toNumber(), calculateSupport(1, 4), 'incorrect absolute positive support')
+                assert.equal((await app.getSupport(1, false)).toNumber(), calculateSupport(3, 4), 'incorrect absolute negative support')
+              })
+
+              it('calculates the correct absolute consensus', async () => {
+                assert.equal((await app.getConsensus(1)).toNumber(), VOTE.NAY, 'incorrect absolute consensus')
+              })
+            })
+          })
         })
       })
     })

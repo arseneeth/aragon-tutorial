@@ -12,6 +12,7 @@ contract ProposalBase {
 
     struct Proposal {
         bool resolved;
+        uint64 creationBlock;
         uint256 totalYeas;
         uint256 totalNays;
         mapping (address => Vote) votes;
@@ -42,6 +43,11 @@ contract ProposalBase {
     function getResolved(uint256 _proposalId) public view returns (bool) {
         Proposal storage proposal_ = _getProposal(_proposalId);
         return proposal_.resolved;
+    }
+
+    function getCreationBlock(uint256 _proposalId) public view returns (uint256) {
+        Proposal storage proposal_ = _getProposal(_proposalId);
+        return proposal_.creationBlock;
     }
 
     /* INTERNAL */
