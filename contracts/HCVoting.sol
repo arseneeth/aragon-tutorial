@@ -24,7 +24,6 @@ contract HCVoting is AragonApp {
     enum Vote { Absent, Yea, Nay }
 
     struct Proposal {
-        uint64 creationBlock;
         uint256 totalYeas;
         uint256 totalNays;
         mapping (address => Vote) votes;
@@ -48,22 +47,14 @@ contract HCVoting is AragonApp {
     /* PUBLIC */
 
     function create(string _metadata) public {
-        uint64 creationBlock = getBlockNumber64() - 1;
-        require(voteToken.totalSupplyAt(creationBlock) > 0, ERROR_NO_VOTING_POWER);
-
-        uint256 proposalId = numProposals;
+        emit ProposalCreated(numProposals, msg.sender, _metadata);
         numProposals++;
-
-        Proposal storage proposal_ = _getProposal(proposalId);
-        proposal_.creationBlock = creationBlock;
-
-        emit ProposalCreated(proposalId, msg.sender, _metadata);
     }
 
     function vote(uint256 _proposalId, bool _supports) public {
         Proposal storage proposal_ = _getProposal(_proposalId);
 
-        uint256 userVotingPower = voteToken.balanceOfAt(msg.sender, proposal_.creationBlock);
+        uint256 userVotingPower = voteToken.balanceOf(msg.sender);
         require(userVotingPower > 0, ERROR_NO_VOTING_POWER);
 
         // Reject redundant votes.
@@ -109,11 +100,6 @@ contract HCVoting is AragonApp {
     function getTotalNays(uint256 _proposalId) public view returns (uint256) {
         Proposal storage proposal_ = _getProposal(_proposalId);
         return proposal_.totalNays;
-    }
-
-    function getCreationBlock(uint256 _proposalId) public view returns (uint256) {
-        Proposal storage proposal_ = _getProposal(_proposalId);
-        return proposal_.creationBlock;
     }
 
     /* INTERNAL */

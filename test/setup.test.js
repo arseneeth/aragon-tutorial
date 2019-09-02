@@ -1,7 +1,7 @@
 /* global contract beforeEach it assert */
 
 const { assertRevert } = require('@aragon/test-helpers/assertThrow')
-const { defaultParams, deployAll, initializeAppWithParams, deployAllAndInitializeApp } = require('./helpers/deployApp')
+const { defaultParams, initializeAppWithParams, deployAllAndInitializeApp } = require('./helpers/deployApp')
 
 contract('HCVoting (setup)', ([appManager]) => {
   let app, voteToken
@@ -19,18 +19,6 @@ contract('HCVoting (setup)', ([appManager]) => {
       await assertRevert(
         initializeAppWithParams(app, defaultParams),
         'INIT_ALREADY_INITIALIZED'
-      )
-    })
-  })
-
-  describe('when attempting to interact with an uninitialized app', () => {
-    before('deploy', async () => {
-      ({ app } = await deployAll(appManager))
-    })
-
-    it('reverts when trying to create a proposal', async () => {
-      await assertRevert(
-        app.create('Proposal metadata')
       )
     })
   })
