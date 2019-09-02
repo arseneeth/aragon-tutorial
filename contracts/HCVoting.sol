@@ -9,7 +9,7 @@ contract HCVoting is AragonApp {
     /* ERRORS */
 
     string internal constant ERROR_PROPOSAL_DOES_NOT_EXIST = "HCVOTING_PROPOSAL_DOES_NOT_EXIST";
-    string internal constant ERROR_REDUNDANT_VOTE        = "HCVOTING_REDUNDANT_VOTE";
+    string internal constant ERROR_REDUNDANT_VOTE          = "HCVOTING_REDUNDANT_VOTE";
 
     /* EVENTS */
 
@@ -21,21 +21,9 @@ contract HCVoting is AragonApp {
     enum Vote { Absent, Yea, Nay }
 
     struct Proposal {
-        bool boosted;
-        bool executed;
-        bool resolved;
-        uint64 creationDate;
-        uint64 closeDate;
-        uint64 pendedDate;
-        uint64 creationBlock;
         uint256 totalYeas;
         uint256 totalNays;
-        uint256 totalUpstake;
-        uint256 totalDownstake;
-        bytes executionScript;
         mapping (address => Vote) votes;
-        mapping (address => uint256) upstakes;
-        mapping (address => uint256) downstakes;
     }
 
     /* PROPERTIES */
