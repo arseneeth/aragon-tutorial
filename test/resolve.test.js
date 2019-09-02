@@ -1,6 +1,7 @@
 /* global contract beforeEach it assert */
 
 const { assertRevert } = require('@aragon/test-helpers/assertThrow')
+const { encodeCallScript } = require('@aragon/test-helpers/evmScript')
 const { getEventAt } = require('@aragon/test-helpers/events')
 const { defaultParams, deployAllAndInitializeApp, VOTE, PROPOSAL_STATE } = require('./helpers/deployApp')
 
@@ -9,12 +10,16 @@ contract('HCVoting (resolve)', ([appManager, creator, voter1, voter2, voter3, vo
   let resolutionReceipt
   let proposalId = -1
 
-  async function createProposal() {
-    await app.create('Proposal metadata')
+  const newRequiredSupport = 400000;
+
+  async function createProposalWithScript() {
+    const action = { to: app.address, calldata: app.contract.changeRequiredSupport.getData(newRequiredSupport) }
+    const script = encodeCallScript([action])
+    await app.create(script, 'Modify support')
     proposalId++
   }
 
-  async function itResolvesTheProposal(consensus, positiveSupport, negativeSupport) {
+  async function itResolvesTheProposal(executes, consensus, positiveSupport, negativeSupport) {
     it('properly calculates the proposal\'s positive support', async () => {
       assert.equal((await app.getSupport(proposalId, true)).toNumber(), positiveSupport)
     })
@@ -32,6 +37,10 @@ contract('HCVoting (resolve)', ([appManager, creator, voter1, voter2, voter3, vo
         resolutionReceipt = await app.resolve(proposalId)
       })
 
+      after('restore requiredSupport', async () => {
+        await app.changeRequiredSupport(defaultParams.requiredSupport)
+      })
+
       it('emits a ProposalResolved event', async () => {
         const resolutionEvent = getEventAt(resolutionReceipt, 'ProposalResolved')
         assert.equal(resolutionEvent.args.proposalId.toNumber(), proposalId, 'invalid proposal id')
@@ -39,6 +48,14 @@ contract('HCVoting (resolve)', ([appManager, creator, voter1, voter2, voter3, vo
 
       it('correctly registers if the proposal is resolved', async () => {
         assert.equal(await app.getResolved(proposalId), true)
+      })
+
+      it('correctly registers if the proposal is executed', async () => {
+        assert.equal(await app.getExecuted(proposalId), executes)
+      })
+
+      it('changes requiredSupport if the proposal is supported', async () => {
+        assert.equal((await app.requiredSupport()).toNumber(), executes ? newRequiredSupport : defaultParams.requiredSupport)
       })
 
       it('reverts when trying to resolve the proposal a second time', async () => {
@@ -63,7 +80,7 @@ contract('HCVoting (resolve)', ([appManager, creator, voter1, voter2, voter3, vo
 
   describe('when trying to resolve a proposal with no consensus', () => {
     before('create proposal', async () => {
-      await createProposal()
+      await createProposalWithScript()
     })
 
     it('evaluates the proposal\'s consensus to be ABSENT', async () => {
@@ -81,7 +98,7 @@ contract('HCVoting (resolve)', ([appManager, creator, voter1, voter2, voter3, vo
   describe('when resolving proposals with absolute consensus', () => {
     describe('when a proposal has absolute negative consensus', () => {
       before('create proposal', async () => {
-        await createProposal()
+        await createProposalWithScript()
       })
 
       before('cast votes', async () => {
@@ -90,12 +107,12 @@ contract('HCVoting (resolve)', ([appManager, creator, voter1, voter2, voter3, vo
         await app.vote(proposalId, false, { from: voter3 })
       })
 
-      itResolvesTheProposal(VOTE.NAY, 0, 750000)
+      itResolvesTheProposal(false, VOTE.NAY, 0, 750000)
     })
 
     describe('when a proposal has absolute positive consensus', () => {
       before('create proposal', async () => {
-        await createProposal()
+        await createProposalWithScript()
       })
 
       before('cast votes', async () => {
@@ -104,7 +121,7 @@ contract('HCVoting (resolve)', ([appManager, creator, voter1, voter2, voter3, vo
         await app.vote(proposalId, true, { from: voter3 })
       })
 
-      itResolvesTheProposal(VOTE.YEA, 750000, 0)
+      itResolvesTheProposal(true, VOTE.YEA, 750000, 0)
     })
   })
 })

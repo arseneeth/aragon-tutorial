@@ -1,5 +1,6 @@
 /* global contract beforeEach it assert */
 
+const { EMPTY_SCRIPT } = require('@aragon/test-helpers/evmScript')
 const { assertRevert } = require('@aragon/test-helpers/assertThrow')
 const { defaultParams, deployAll, initializeAppWithParams, deployAllAndInitializeApp } = require('./helpers/deployApp')
 
@@ -44,6 +45,19 @@ contract('HCVoting (setup)', ([appManager]) => {
           requiredSupport: 1000001
         }),
         'HCVOTING_BAD_REQUIRED_SUPPORT'
+      )
+    })
+  })
+
+  describe('when attempting to interact with an uninitialized app', () => {
+    before('deploy', async () => {
+      ({ app } = await deployAll(appManager))
+    })
+
+    it('reverts when trying to create a proposal', async () => {
+      await assertRevert(
+        app.create(EMPTY_SCRIPT, 'Proposal metadata'),
+        'APP_AUTH_FAILED'
       )
     })
   })
