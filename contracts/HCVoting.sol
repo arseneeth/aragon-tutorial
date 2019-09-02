@@ -1,3 +1,5 @@
+import "./ProposalBase.sol";
+
 import "@aragon/os/contracts/apps/AragonApp.sol";
 
 import "@aragon/os/contracts/lib/math/SafeMath.sol";
@@ -5,44 +7,33 @@ import "@aragon/os/contracts/lib/math/SafeMath.sol";
 import "@aragon/apps-shared-minime/contracts/MiniMeToken.sol";
 
 
-contract HCVoting is AragonApp {
+contract HCVoting is ProposalBase, AragonApp {
     using SafeMath for uint256;
 
     /* ERRORS */
 
-    string internal constant ERROR_BAD_REQUIRED_SUPPORT    = "HCVOTING_BAD_REQUIRED_SUPPORT";
-    string internal constant ERROR_PROPOSAL_DOES_NOT_EXIST = "HCVOTING_PROPOSAL_DOES_NOT_EXIST";
-    string internal constant ERROR_REDUNDANT_VOTE          = "HCVOTING_REDUNDANT_VOTE";
-    string internal constant ERROR_NO_VOTING_POWER         = "HCVOTING_NO_VOTING_POWER";
+    string internal constant ERROR_BAD_REQUIRED_SUPPORT  = "HCVOTING_BAD_REQUIRED_SUPPORT";
+    string internal constant ERROR_PROPOSAL_IS_RESOLVED  = "HCVOTING_PROPOSAL_IS_RESOLVED";
+    string internal constant ERROR_REDUNDANT_VOTE        = "HCVOTING_REDUNDANT_VOTE";
+    string internal constant ERROR_NO_VOTING_POWER       = "HCVOTING_NO_VOTING_POWER";
+    string internal constant ERROR_NO_CONSENSUS          = "HCVOTING_NO_CONSENSUS";
 
     /* EVENTS */
 
     event ProposalCreated(uint256 proposalId, address creator, string metadata);
     event VoteCasted(uint256 proposalId, address voter, bool supports);
+    event ProposalResolved(uint256 proposalId);
 
     /* CONSTANTS */
 
     // Used to avoid integer precision loss in divisions.
     uint256 internal constant MILLION = 1000000;
 
-    /* DATA STRUCTURES */
-
-    enum Vote { Absent, Yea, Nay }
-
-    struct Proposal {
-        uint256 totalYeas;
-        uint256 totalNays;
-        mapping (address => Vote) votes;
-    }
-
     /* PROPERTIES */
 
     MiniMeToken public voteToken;
 
     uint256 public requiredSupport; // Expressed as parts per million, 51% = 510000
-
-    mapping (uint256 => Proposal) proposals;
-    uint256 public numProposals;
 
     /* INIT */
 
@@ -97,6 +88,19 @@ contract HCVoting is AragonApp {
         emit VoteCasted(_proposalId, msg.sender, _supports);
     }
 
+    function resolve(uint256 _proposalId) public {
+        Proposal storage proposal_ = _getProposal(_proposalId);
+
+        require(!proposal_.resolved, ERROR_PROPOSAL_IS_RESOLVED);
+
+        Vote support = getConsensus(_proposalId);
+        require(support != Vote.Absent, ERROR_NO_CONSENSUS);
+
+        proposal_.resolved = true;
+
+        emit ProposalResolved(_proposalId);
+    }
+
     /* CALCULATED PROPERTIES */
 
     function getConsensus(uint256 _proposalId) public view returns (Vote) {
@@ -121,29 +125,5 @@ contract HCVoting is AragonApp {
         uint256 votes = _supports ? proposal_.totalYeas : proposal_.totalNays;
 
         return votes.mul(MILLION).div(votingPower);
-    }
-
-    /* GETTERS */
-
-    function getVote(uint256 _proposalId, address _user) public view returns (Vote) {
-        Proposal storage proposal_ = _getProposal(_proposalId);
-        return proposal_.votes[_user];
-    }
-
-    function getTotalYeas(uint256 _proposalId) public view returns (uint256) {
-        Proposal storage proposal_ = _getProposal(_proposalId);
-        return proposal_.totalYeas;
-    }
-
-    function getTotalNays(uint256 _proposalId) public view returns (uint256) {
-        Proposal storage proposal_ = _getProposal(_proposalId);
-        return proposal_.totalNays;
-    }
-
-    /* INTERNAL */
-
-    function _getProposal(uint256 _proposalId) internal view returns (Proposal storage) {
-        require(_proposalId < numProposals, ERROR_PROPOSAL_DOES_NOT_EXIST);
-        return proposals[_proposalId];
     }
 }
