@@ -8,7 +8,7 @@ contract('HCVoting (create)', ([appManager, user1, user2]) => {
   let app
 
   before('deploy app', async () => {
-    ({ app, voteToken } = await deployAllAndInitializeApp(appManager))
+    ({ app } = await deployAllAndInitializeApp(appManager))
   })
 
   describe('when no proposals exist', () => {
