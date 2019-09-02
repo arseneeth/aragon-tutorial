@@ -10,6 +10,7 @@ contract HCVoting is AragonApp {
 
     /* ERRORS */
 
+    string internal constant ERROR_BAD_REQUIRED_SUPPORT    = "HCVOTING_BAD_REQUIRED_SUPPORT";
     string internal constant ERROR_PROPOSAL_DOES_NOT_EXIST = "HCVOTING_PROPOSAL_DOES_NOT_EXIST";
     string internal constant ERROR_REDUNDANT_VOTE          = "HCVOTING_REDUNDANT_VOTE";
     string internal constant ERROR_NO_VOTING_POWER         = "HCVOTING_NO_VOTING_POWER";
@@ -18,6 +19,11 @@ contract HCVoting is AragonApp {
 
     event ProposalCreated(uint256 proposalId, address creator, string metadata);
     event VoteCasted(uint256 proposalId, address voter, bool supports);
+
+    /* CONSTANTS */
+
+    // Used to avoid integer precision loss in divisions.
+    uint256 internal constant MILLION = 1000000;
 
     /* DATA STRUCTURES */
 
@@ -33,13 +39,19 @@ contract HCVoting is AragonApp {
 
     MiniMeToken public voteToken;
 
+    uint256 public requiredSupport; // Expressed as parts per million, 51% = 510000
+
     mapping (uint256 => Proposal) proposals;
     uint256 public numProposals;
 
     /* INIT */
 
-    function initialize(MiniMeToken _voteToken) public onlyInit {
+    function initialize(MiniMeToken _voteToken, uint256 _requiredSupport) public onlyInit {
+        require(_requiredSupport > 0, ERROR_BAD_REQUIRED_SUPPORT);
+        require(_requiredSupport <= MILLION, ERROR_BAD_REQUIRED_SUPPORT);
+
         voteToken = _voteToken;
+        requiredSupport = _requiredSupport;
 
         initialized();
     }
@@ -83,6 +95,32 @@ contract HCVoting is AragonApp {
         proposal_.votes[msg.sender] = _supports ? Vote.Yea : Vote.Nay;
 
         emit VoteCasted(_proposalId, msg.sender, _supports);
+    }
+
+    /* CALCULATED PROPERTIES */
+
+    function getConsensus(uint256 _proposalId) public view returns (Vote) {
+        uint256 yeaPPM = getSupport(_proposalId, true);
+        uint256 nayPPM = getSupport(_proposalId, false);
+
+        if (yeaPPM > requiredSupport) {
+            return Vote.Yea;
+        }
+
+        if (nayPPM > requiredSupport) {
+            return Vote.Nay;
+        }
+
+        return Vote.Absent;
+    }
+
+    function getSupport(uint _proposalId, bool _supports) public view returns (uint256) {
+        Proposal storage proposal_ = _getProposal(_proposalId);
+
+        uint256 votingPower = voteToken.totalSupply();
+        uint256 votes = _supports ? proposal_.totalYeas : proposal_.totalNays;
+
+        return votes.mul(MILLION).div(votingPower);
     }
 
     /* GETTERS */

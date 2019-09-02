@@ -15,11 +15,14 @@ const VOTE = {
   NAY: 2
 }
 
-const defaultParams = {}
+const defaultParams = {
+  requiredSupport: 510000
+}
 
 const paramsObjToArr = (paramsObj) => {
   return [
-    paramsObj.voteToken.address
+    paramsObj.voteToken.address,
+    paramsObj.requiredSupport
   ]
 }
 

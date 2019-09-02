@@ -5,6 +5,7 @@ const { getEventAt } = require('@aragon/test-helpers/events')
 const { deployAllAndInitializeApp, VOTE } = require('./helpers/deployApp')
 
 const VOTER_BALANCE = 100
+const MILLION = 1000000
 
 contract('HCVoting (vote)', ([appManager, voter1, voter2, voter3, voter4]) => {
   let app
@@ -21,6 +22,10 @@ contract('HCVoting (vote)', ([appManager, voter1, voter2, voter3, voter4]) => {
   })
 
   describe('when a proposal exists', () => {
+    const calculateSupport = (numVotes, numVoters) => {
+      return numVotes * MILLION / numVoters
+    }
+
     before('mint some tokens', async () => {
       await voteToken.generateTokens(voter1, VOTER_BALANCE)
       await voteToken.generateTokens(voter2, VOTER_BALANCE)
@@ -67,6 +72,15 @@ contract('HCVoting (vote)', ([appManager, voter1, voter2, voter3, voter4]) => {
         )
       })
 
+      it('calculates the correct absolute support', async () => {
+        assert.equal((await app.getSupport(0, true)).toNumber(), calculateSupport(0, 2), 'incorrect absolute positive support')
+        assert.equal((await app.getSupport(0, false)).toNumber(), calculateSupport(1, 2), 'incorrect absolute negative support')
+      })
+
+      it('calculates the correct absolute consensus', async () => {
+        assert.equal((await app.getConsensus(0)).toNumber(), VOTE.ABSENT, 'incorrect absolute consensus')
+      })
+
       describe('when voter1 changes the Nay vote to Yea', () => {
         before('change vote', async () => {
           await app.vote(0, true, { from: voter1 })
@@ -81,6 +95,11 @@ contract('HCVoting (vote)', ([appManager, voter1, voter2, voter3, voter4]) => {
           assert.equal((await app.getTotalNays(0)).toNumber(), 0, 'invalid nays')
         })
 
+        it('calculates the correct absolute support', async () => {
+          assert.equal((await app.getSupport(0, true)).toNumber(), calculateSupport(1, 2), 'incorrect absolute positive support')
+          assert.equal((await app.getSupport(0, false)).toNumber(), calculateSupport(0, 2), 'incorrect absolute negative support')
+        })
+
         describe('when voter2 casts a Yea vote on the proposal', () => {
           before('cast vote', async () => {
             await app.vote(0, true, { from: voter2 })
@@ -93,6 +112,15 @@ contract('HCVoting (vote)', ([appManager, voter1, voter2, voter3, voter4]) => {
           it('registers the correct totalYeas/totalNays', async () => {
             assert.equal((await app.getTotalYeas(0)).toNumber(), 2 * VOTER_BALANCE, 'invalid yeas')
             assert.equal((await app.getTotalNays(0)).toNumber(), 0, 'invalid nays')
+          })
+
+          it('calculates the correct absolute support', async () => {
+            assert.equal((await app.getSupport(0, true)).toNumber(), calculateSupport(2, 2), 'incorrect absolute positive support')
+            assert.equal((await app.getSupport(0, false)).toNumber(), calculateSupport(0, 2), 'incorrect absolute negative support')
+          })
+
+          it('calculates the correct absolute consensus', async () => {
+            assert.equal((await app.getConsensus(0)).toNumber(), VOTE.YEA, 'incorrect absolute consensus')
           })
         })
       })
