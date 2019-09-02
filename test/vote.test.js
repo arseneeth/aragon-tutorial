@@ -4,6 +4,8 @@ const { assertRevert } = require('@aragon/test-helpers/assertThrow')
 const { getEventAt } = require('@aragon/test-helpers/events')
 const { deployAllAndInitializeApp, VOTE } = require('./helpers/deployApp')
 
+const VOTER_BALANCE = 100
+
 contract('HCVoting (vote)', ([appManager, voter1, voter2, voter3, voter4]) => {
   let app
 
@@ -19,8 +21,20 @@ contract('HCVoting (vote)', ([appManager, voter1, voter2, voter3, voter4]) => {
   })
 
   describe('when a proposal exists', () => {
+    before('mint some tokens', async () => {
+      await voteToken.generateTokens(voter1, VOTER_BALANCE)
+      await voteToken.generateTokens(voter2, VOTER_BALANCE)
+    })
+
     before('create a proposal', async () => {
       await app.create('Proposal metadata 0')
+    })
+
+    it('should not allow a user with no voting power to vote', async () => {
+      await assertRevert(
+        app.vote(0, true, { from: voter3 }),
+        'HCVOTING_NO_VOTING_POWER'
+      )
     })
 
     describe('when voter1 casts a Nay vote on the proposal', () => {
@@ -39,7 +53,7 @@ contract('HCVoting (vote)', ([appManager, voter1, voter2, voter3, voter4]) => {
 
       it('registers the correct totalYeas/totalNays', async () => {
         assert.equal((await app.getTotalYeas(0)).toNumber(), 0, 'invalid yeas')
-        assert.equal((await app.getTotalNays(0)).toNumber(), 1, 'invalid nays')
+        assert.equal((await app.getTotalNays(0)).toNumber(), VOTER_BALANCE, 'invalid nays')
       })
 
       it('should record the user\'s vote as Nay', async () => {
@@ -63,7 +77,7 @@ contract('HCVoting (vote)', ([appManager, voter1, voter2, voter3, voter4]) => {
         })
 
         it('registers the correct totalYeas/totalNays', async () => {
-          assert.equal((await app.getTotalYeas(0)).toNumber(), 1, 'invalid yeas')
+          assert.equal((await app.getTotalYeas(0)).toNumber(), VOTER_BALANCE, 'invalid yeas')
           assert.equal((await app.getTotalNays(0)).toNumber(), 0, 'invalid nays')
         })
 
@@ -77,7 +91,7 @@ contract('HCVoting (vote)', ([appManager, voter1, voter2, voter3, voter4]) => {
           })
 
           it('registers the correct totalYeas/totalNays', async () => {
-            assert.equal((await app.getTotalYeas(0)).toNumber(), 2, 'invalid yeas')
+            assert.equal((await app.getTotalYeas(0)).toNumber(), 2 * VOTER_BALANCE, 'invalid yeas')
             assert.equal((await app.getTotalNays(0)).toNumber(), 0, 'invalid nays')
           })
         })

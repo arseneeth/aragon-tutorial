@@ -2,6 +2,7 @@
 
 const { getEventArgument } = require('@aragon/test-helpers/events')
 const { hash } = require('eth-ens-namehash')
+const { deployVoteToken } = require('./deployTokens.js')
 const { deployDAO } = require('./deployDAO.js')
 
 const HCVoting = artifacts.require('HCVoting.sol')
@@ -14,20 +15,42 @@ const VOTE = {
   NAY: 2
 }
 
+const defaultParams = {}
+
+const paramsObjToArr = (paramsObj) => {
+  return [
+    paramsObj.voteToken.address
+  ]
+}
+
 const deployAll = async (appManager) => {
   const { dao, acl } = await deployDAO(appManager)
 
+  const voteToken = await deployVoteToken()
+
   const app = await deployApp(dao, acl, appManager)
 
-  return { dao, acl, app }
+  return { dao, acl, voteToken, app }
 }
 
-const deployAllAndInitializeApp = async (appManager) => {
+const deployAllAndInitializeApp = async (appManager, params) => {
+  if (!params) {
+    params = defaultParams
+  }
+
   const deployed = await deployAll(appManager)
 
-  await deployed.app.initialize()
+  params.voteToken = deployed.voteToken
+
+  await initializeAppWithParams(deployed.app, params)
 
   return deployed
+}
+
+const initializeAppWithParams = async (app, params) => {
+  await app.initialize(
+    ...paramsObjToArr(params)
+  )
 }
 
 const deployApp = async (dao, acl, appManager) => {
@@ -66,6 +89,8 @@ const deployApp = async (dao, acl, appManager) => {
 }
 
 module.exports = {
+  defaultParams,
+  initializeAppWithParams,
   deployApp,
   deployAll,
   deployAllAndInitializeApp,
