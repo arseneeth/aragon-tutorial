@@ -4,4 +4,5 @@ contract HCVoting is AragonApp {
 	function initialize() public onlyInit {
 		initialized();
 	}
+
 }
